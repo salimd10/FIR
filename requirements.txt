@@ -1,0 +1,70 @@
+# FastAPI and Web Framework
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+pydantic==2.6.1
+pydantic-settings==2.1.0
+python-multipart==0.0.9
+
+# Document Processing
+unstructured[pdf]
+pdfplumber==0.11.0
+pdf2image==1.17.0
+pytesseract==0.3.10
+python-magic==0.4.27
+pillow
+opencv-python==4.9.0.80
+
+# Vector Database
+qdrant-client==1.7.3
+
+# Embeddings and LLM
+openai==1.12.0
+tiktoken==0.6.0
+
+# LangChain Ecosystem
+langchain
+langchain-openai
+langchain-community
+langchain-core
+
+# Retrieval
+rank-bm25==0.2.2
+sentence-transformers==2.5.1
+
+# Evaluation
+ragas==0.1.5
+datasets==2.17.1
+
+# Data Processing
+pandas
+numpy
+
+# HTTP Clients
+httpx==0.27.0
+aiofiles==23.2.1
+
+# Environment Management
+python-dotenv==1.0.1
+
+# Logging and Monitoring
+loguru==0.7.2
+
+# Testing
+pytest==8.0.2
+pytest-asyncio==0.23.5
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+httpx==0.27.0
+
+# PDF Generation for Documentation
+reportlab==4.1.0
+weasyprint==61.2
+markdown2==2.4.12
+pygments==2.17.2
+
+# Development
+black==24.2.0
+isort==5.13.2
+flake8==7.0.0
+mypy==1.8.0
+pre-commit==3.6.2

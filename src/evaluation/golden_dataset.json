@@ -1,0 +1,62 @@
+[
+  {
+    "question_id": "Q1",
+    "question": "If Apple's total Net Sales for FY2025 were $400 Billion, what was the exact dollar value difference between Net Sales through indirect distribution channels and Net Sales through direct distribution channels?",
+    "expected_answer": "$80 Billion. (Indirect sales account for 60% of total net sales and direct sales account for 40% of total net sales. Calculation: (60% of $400B) - (40% of $400B) = $240B - $160B = $80B)",
+    "expected_calculation": "((0.60 * 400) - (0.40 * 400))",
+    "expected_result": 80.0,
+    "page_reference": 45,
+    "section": "Segment Operating Performance or Financial Data",
+    "requires_calculation": true,
+    "difficulty": "medium",
+    "tags": ["sales_channels", "distribution", "calculation", "percentage"]
+  },
+  {
+    "question_id": "Q2",
+    "question": "What was the year-over-year percentage change in Research and Development (R&D) expenses between Fiscal Year 2024 and Fiscal Year 2025?",
+    "expected_answer": "The exact percentage depends on the values in the 10-K. The model must extract R&D expense figures from the Consolidated Statement of Operations for both years and perform the calculation: [(FY2025 R&D - FY2024 R&D) / FY2024 R&D] * 100%.",
+    "expected_calculation": "((rd_2025 - rd_2024) / rd_2024) * 100",
+    "expected_result": null,
+    "page_reference": 39,
+    "section": "Consolidated Statement of Operations",
+    "requires_calculation": true,
+    "difficulty": "medium",
+    "tags": ["r&d", "year-over-year", "growth_rate", "financial_statements"]
+  },
+  {
+    "question_id": "Q3",
+    "question": "Calculate the difference between GAAP Net Income and Non-GAAP Adjusted Net Income for the Greater China segment in FY 2025, using the reconciliation table in Note 2.",
+    "expected_answer": "The model must identify both figures from the notes/reconciliation tables and subtract the GAAP figure from the Non-GAAP figure. The exact value depends on the document contents.",
+    "expected_calculation": "non_gaap_net_income - gaap_net_income",
+    "expected_result": null,
+    "page_reference": 88,
+    "section": "Note 2 Reconciliation or Financial Notes",
+    "requires_calculation": true,
+    "difficulty": "hard",
+    "tags": ["gaap", "non-gaap", "segment", "china", "reconciliation"]
+  },
+  {
+    "question_id": "Q4",
+    "question": "Determine the total Net Sales from Services (App Store, Apple Music, etc.) as a percentage of combined hardware sales (iPhone, MacBook, iPad) for the Americas segment in FY 2025.",
+    "expected_answer": "The model needs to pull Services Net Sales and Hardware Net Sales for the Americas segment and calculate: [Services Sales / (Services Sales + Hardware Sales)] * 100%.",
+    "expected_calculation": "(services_sales / (services_sales + hardware_sales)) * 100",
+    "expected_result": null,
+    "page_reference": 48,
+    "section": "Segment Data or Product Category Performance",
+    "requires_calculation": true,
+    "difficulty": "hard",
+    "tags": ["services", "hardware", "americas", "segment", "product_mix"]
+  },
+  {
+    "question_id": "Q5",
+    "question": "What percentage of essential materials are obtained from a single or limited source, and how does the company's reliance on intellectual property rights mitigate the risk of aggressive pricing in competitive markets?",
+    "expected_answer": "The model should extract the specific percentage from the Risk Factors section and explain that the company relies on IP rights, including patents and trademarks, to differentiate its offerings and maintain pricing power despite supply chain concentration.",
+    "expected_calculation": null,
+    "expected_result": null,
+    "page_reference": 11,
+    "section": "Risk Factors",
+    "requires_calculation": false,
+    "difficulty": "hard",
+    "tags": ["supply_chain", "risk", "intellectual_property", "competitive_advantage"]
+  }
+]
