@@ -3,10 +3,32 @@ Calculator tool using Python REPL for multi-step financial calculations.
 Ensures LLM doesn't perform mental math.
 """
 from typing import Dict, Any, Optional, List
-from langchain.tools import Tool
-from langchain_experimental.utilities import PythonREPL
+from langchain_core.tools import Tool
 from loguru import logger
 import re
+import io
+import sys
+
+
+class _SimplePythonREPL:
+    """Minimal Python REPL replacement for langchain_experimental.utilities.PythonREPL."""
+
+    def run(self, code: str) -> str:
+        buffer = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = buffer
+        try:
+            result = eval(code)  # noqa: S307
+            sys.stdout = old_stdout
+            if result is not None:
+                return str(result)
+            return buffer.getvalue()
+        except SyntaxError:
+            sys.stdout = old_stdout
+            exec(code)  # noqa: S102
+            return buffer.getvalue()
+        finally:
+            sys.stdout = old_stdout
 
 
 class FinancialCalculatorTool:
@@ -17,7 +39,7 @@ class FinancialCalculatorTool:
 
     def __init__(self):
         """Initialize the calculator tool."""
-        self.python_repl = PythonREPL()
+        self.python_repl = _SimplePythonREPL()
         self.logger = logger.bind(module="calculator_tool")
         self.calculation_history = []
 

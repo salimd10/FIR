@@ -40,22 +40,30 @@ class QueryExpander:
         """
         self.settings = get_settings()
         self.logger = logger.bind(module="query_expander")
+        self._llm_model = llm_model
+        self._llm_provider = llm_provider
+        self._temperature = temperature
+        self._llm = None  # lazily initialised on first use
 
-        # Initialize LLM based on provider
-        if llm_provider.lower() == "anthropic":
-            self.llm = ChatAnthropic(
-                model=llm_model,
-                temperature=temperature,
-                anthropic_api_key=self.settings.anthropic_api_key
-            )
-        else:  # openai
-            self.llm = ChatOpenAI(
-                model=llm_model,
-                temperature=temperature,
-                api_key=self.settings.openai_api_key
-            )
+        self.logger.info(f"Query Expander initialised with {llm_provider} model: {llm_model}")
 
-        self.logger.info(f"Query Expander initialized with {llm_provider} model: {llm_model}")
+    @property
+    def llm(self):
+        """Return the LLM, initialising it on first access."""
+        if self._llm is None:
+            if self._llm_provider.lower() == "anthropic":
+                self._llm = ChatAnthropic(
+                    model=self._llm_model,
+                    temperature=self._temperature,
+                    anthropic_api_key=self.settings.anthropic_api_key,
+                )
+            else:  # openai
+                self._llm = ChatOpenAI(
+                    model=self._llm_model,
+                    temperature=self._temperature,
+                    api_key=self.settings.openai_api_key,
+                )
+        return self._llm
 
     def is_vague_query(self, query: str) -> bool:
         """

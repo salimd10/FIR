@@ -435,6 +435,73 @@ class FinancialDocumentChunker:
         return '.'.join(sentences).strip()[:200] + "..."
 
 
+class SemanticChunker:
+    """
+    Simple text-based chunker that splits plain text into token-bounded chunks.
+    Returns chunks as plain dicts, suitable for RAG pipelines.
+    """
+
+    def __init__(self, chunk_size: int = 1024, chunk_overlap: int = 128, model_name: str = "gpt-4"):
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        try:
+            self.encoding = tiktoken.encoding_for_model(model_name)
+        except KeyError:
+            self.encoding = tiktoken.get_encoding("cl100k_base")
+
+    def _count_tokens(self, text: str) -> int:
+        if not text:
+            return 0
+        return len(self.encoding.encode(text))
+
+    def chunk_text(self, text: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Split text into overlapping token-bounded chunks.
+
+        Args:
+            text: Plain text to chunk
+            metadata: Source metadata (keys: page, section, etc.)
+
+        Returns:
+            List of dicts with 'content' and 'metadata' keys
+        """
+        if not text:
+            return []
+
+        tokens = self.encoding.encode(text)
+        total_tokens = len(tokens)
+
+        if total_tokens <= self.chunk_size:
+            return [{
+                "content": text,
+                "metadata": {
+                    "page_number": metadata.get("page"),
+                    "section": metadata.get("section"),
+                    **{k: v for k, v in metadata.items() if k not in ("page", "section")},
+                }
+            }]
+
+        chunks = []
+        start = 0
+        while start < total_tokens:
+            end = min(start + self.chunk_size, total_tokens)
+            chunk_tokens = tokens[start:end]
+            chunk_text = self.encoding.decode(chunk_tokens)
+            chunks.append({
+                "content": chunk_text,
+                "metadata": {
+                    "page_number": metadata.get("page"),
+                    "section": metadata.get("section"),
+                    **{k: v for k, v in metadata.items() if k not in ("page", "section")},
+                }
+            })
+            if end == total_tokens:
+                break
+            start = end - self.chunk_overlap
+
+        return chunks
+
+
 # Convenience function
 def chunk_financial_document(
     parsed_document: Dict[str, Any],
