@@ -105,7 +105,7 @@ PYTHONPATH=. .venv/bin/python src/ingestion/document_loader.py data/raw/apple-10
 This will:
 1. Parse the PDF with layout awareness
 2. Extract and convert tables to Markdown
-3. Chunk content semantically (1024 tokens, 128 overlap)
+3. Chunk content semantically (512 tokens, 64 overlap)
 4. Generate embeddings (OpenAI text-embedding-3-large)
 5. Store in Qdrant and build BM25 index
 
