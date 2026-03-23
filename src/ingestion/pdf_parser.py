@@ -1,89 +1,180 @@
 """
 Layout-aware PDF parser for financial documents.
-Uses unstructured.io for high-resolution parsing with table preservation.
+Uses pdfplumber for text and table extraction.
 """
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+import re
 import pdfplumber
-from unstructured.partition.pdf import partition_pdf
-from unstructured.documents.elements import (
-    Element,
-    Table,
-    Title,
-    NarrativeText,
-    ListItem,
-    Footer,
-    Header
-)
 from loguru import logger
 import json
 
 
 class FinancialPDFParser:
     """
-    Advanced PDF parser specifically designed for financial documents.
-    Handles complex layouts, nested tables, and footnotes.
+    PDF parser for financial documents using pdfplumber.
+    Extracts text elements and tables page by page, preserving
+    section context and table structure.
     """
 
     def __init__(self):
-        """Initialize the PDF parser."""
         self.logger = logger.bind(module="pdf_parser")
 
     def parse_document(
         self,
         pdf_path: Path,
-        strategy: str = "hi_res"
+        strategy: str = "fast"  # kept for API compatibility, unused
     ) -> Dict[str, Any]:
         """
-        Parse a PDF document with layout awareness.
+        Parse a PDF document into structured elements.
 
         Args:
             pdf_path: Path to the PDF file
-            strategy: Parsing strategy ('hi_res', 'fast', 'ocr_only')
+            strategy: Ignored (kept for API compatibility)
 
         Returns:
-            Dictionary containing parsed elements with metadata
+            Dictionary with metadata, content elements, counts
         """
-        self.logger.info(f"Parsing PDF: {pdf_path} with strategy: {strategy}")
+        self.logger.info(f"Parsing PDF: {pdf_path.name}")
 
-        try:
-            # Use unstructured.io for layout-aware parsing
-            elements = partition_pdf(
-                filename=str(pdf_path),
-                strategy=strategy,
-                infer_table_structure=True,
-                include_page_breaks=True,
-                extract_images_in_pdf=False,  # We focus on text and tables
-                languages=["eng"],
-            )
+        structured_content: List[Dict[str, Any]] = []
+        tables_found = 0
+        element_idx = 0
+        current_section: Optional[str] = None
 
-            # Extract metadata using pdfplumber for precise page info
-            pdf_metadata = self._extract_metadata(pdf_path)
-
-            # Process elements into structured format
-            structured_content = self._process_elements(elements, pdf_path)
-
-            return {
-                "metadata": pdf_metadata,
-                "content": structured_content,
-                "total_elements": len(elements),
-                "tables_found": sum(1 for e in elements if isinstance(e, Table)),
+        with pdfplumber.open(pdf_path) as pdf:
+            pdf_metadata = {
+                "filename": pdf_path.name,
+                "total_pages": len(pdf.pages),
+                "pdf_metadata": pdf.metadata or {},
             }
 
-        except Exception as e:
-            self.logger.error(f"Error parsing PDF {pdf_path}: {str(e)}")
-            raise
+            for page_num, page in enumerate(pdf.pages, start=1):
+                # --- Extract tables first so we can skip their bounding boxes ---
+                page_tables = page.extract_tables() or []
+                table_bboxes = [t.bbox for t in page.find_tables()] if page_tables else []
+
+                for table_data in page_tables:
+                    if not table_data:
+                        continue
+                    # Convert None cells to empty strings
+                    clean_data = [
+                        [cell or "" for cell in row]
+                        for row in table_data
+                    ]
+                    content_str = self._table_to_text(clean_data)
+                    structured_content.append({
+                        "id": f"element_{element_idx}",
+                        "type": "Table",
+                        "content": content_str,
+                        "page_number": page_num,
+                        "section": current_section,
+                        "metadata": {"page_number": page_num},
+                        "is_table": True,
+                        "table_data": {
+                            "rows": len(clean_data),
+                            "columns": len(clean_data[0]) if clean_data else 0,
+                            "data": clean_data,
+                            "html": None,
+                        },
+                    })
+                    element_idx += 1
+                    tables_found += 1
+
+                # --- Extract text, splitting into paragraphs ---
+                raw_text = page.extract_text() or ""
+                paragraphs = self._split_into_paragraphs(raw_text)
+
+                for para in paragraphs:
+                    if not para.strip():
+                        continue
+
+                    elem_type = self._classify_element(para)
+                    if elem_type == "Title":
+                        current_section = para.strip()
+
+                    structured_content.append({
+                        "id": f"element_{element_idx}",
+                        "type": elem_type,
+                        "content": para.strip(),
+                        "page_number": page_num,
+                        "section": current_section,
+                        "metadata": {"page_number": page_num},
+                        "is_table": False,
+                        "table_data": None,
+                    })
+                    element_idx += 1
+
+        self.logger.info(
+            f"Parsed {pdf_metadata['total_pages']} pages, "
+            f"{len(structured_content)} elements, {tables_found} tables"
+        )
+
+        return {
+            "metadata": pdf_metadata,
+            "content": structured_content,
+            "total_elements": len(structured_content),
+            "tables_found": tables_found,
+        }
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _split_into_paragraphs(self, text: str) -> List[str]:
+        """Split raw page text into paragraph-sized chunks."""
+        # Split on blank lines first
+        blocks = re.split(r"\n{2,}", text)
+        result = []
+        for block in blocks:
+            block = block.strip()
+            if not block:
+                continue
+            # If block is very long, further split on sentence boundaries
+            if len(block) > 1500:
+                sentences = re.split(r"(?<=[.!?])\s+", block)
+                chunk, chunks = "", []
+                for s in sentences:
+                    if len(chunk) + len(s) > 1000 and chunk:
+                        chunks.append(chunk.strip())
+                        chunk = s
+                    else:
+                        chunk = (chunk + " " + s).strip()
+                if chunk:
+                    chunks.append(chunk)
+                result.extend(chunks)
+            else:
+                result.append(block)
+        return result
+
+    def _classify_element(self, text: str) -> str:
+        """Heuristically classify a text block as Title or NarrativeText."""
+        stripped = text.strip()
+        lines = stripped.splitlines()
+        # Title heuristics: short, no trailing period, ALL CAPS or Title Case
+        if len(lines) <= 2 and len(stripped) <= 120:
+            if stripped.isupper():
+                return "Title"
+            if stripped.istitle() and not stripped.endswith("."):
+                return "Title"
+            if re.match(r"^(ITEM|PART|NOTE|SECTION)\s+\d+", stripped, re.IGNORECASE):
+                return "Title"
+        return "NarrativeText"
+
+    def _table_to_text(self, table_data: List[List[str]]) -> str:
+        """Convert table rows to a readable text representation."""
+        if not table_data:
+            return ""
+        lines = []
+        for row in table_data:
+            lines.append(" | ".join(str(cell) for cell in row))
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Utility methods (kept for API compatibility)
+    # ------------------------------------------------------------------
 
     def _extract_metadata(self, pdf_path: Path) -> Dict[str, Any]:
-        """
-        Extract document metadata using pdfplumber.
-
-        Args:
-            pdf_path: Path to PDF file
-
-        Returns:
-            Dictionary with document metadata
-        """
         with pdfplumber.open(pdf_path) as pdf:
             return {
                 "filename": pdf_path.name,
@@ -91,199 +182,43 @@ class FinancialPDFParser:
                 "pdf_metadata": pdf.metadata or {},
             }
 
-    def _process_elements(
-        self,
-        elements: List[Element],
-        pdf_path: Path
-    ) -> List[Dict[str, Any]]:
-        """
-        Process unstructured elements into structured format.
-
-        Args:
-            elements: List of parsed elements from unstructured
-            pdf_path: Path to PDF file
-
-        Returns:
-            List of structured content dictionaries
-        """
-        structured_content = []
-        current_page = 1
-        current_section = None
-
-        for idx, element in enumerate(elements):
-            # Get element metadata
-            metadata = element.metadata.to_dict() if hasattr(element, 'metadata') else {}
-
-            # Update page number if available
-            if metadata.get('page_number'):
-                current_page = metadata['page_number']
-
-            # Update section from titles
-            if isinstance(element, Title):
-                current_section = str(element)
-
-            # Create structured element
-            structured_element = {
-                "id": f"element_{idx}",
-                "type": element.category if hasattr(element, 'category') else type(element).__name__,
-                "content": str(element),
-                "page_number": current_page,
-                "section": current_section,
-                "metadata": metadata,
-            }
-
-            # Special handling for tables
-            if isinstance(element, Table):
-                structured_element["is_table"] = True
-                structured_element["table_data"] = self._extract_table_structure(
-                    element,
-                    pdf_path,
-                    current_page
-                )
-            else:
-                structured_element["is_table"] = False
-
-            structured_content.append(structured_element)
-
-        return structured_content
-
-    def _extract_table_structure(
-        self,
-        table_element: Element,
-        pdf_path: Path,
-        page_number: int
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Extract detailed table structure using pdfplumber as fallback.
-
-        Args:
-            table_element: Table element from unstructured
-            pdf_path: Path to PDF file
-            page_number: Current page number
-
-        Returns:
-            Dictionary with table structure or None
-        """
-        try:
-            # Try to get HTML representation from unstructured
-            table_html = None
-            if hasattr(table_element.metadata, 'text_as_html'):
-                table_html = table_element.metadata.text_as_html
-
-            # Use pdfplumber for precise table extraction
-            with pdfplumber.open(pdf_path) as pdf:
-                if page_number <= len(pdf.pages):
-                    page = pdf.pages[page_number - 1]
-                    tables = page.extract_tables()
-
-                    if tables:
-                        # Take the first table on the page (can be enhanced)
-                        table_data = tables[0]
-
-                        return {
-                            "rows": len(table_data),
-                            "columns": len(table_data[0]) if table_data else 0,
-                            "data": table_data,
-                            "html": table_html,
-                        }
-
-            return None
-
-        except Exception as e:
-            self.logger.warning(f"Could not extract table structure: {str(e)}")
-            return None
-
     def extract_tables_from_page(
         self,
         pdf_path: Path,
         page_number: int
     ) -> List[List[List[str]]]:
-        """
-        Extract all tables from a specific page.
-
-        Args:
-            pdf_path: Path to PDF file
-            page_number: Page number (1-indexed)
-
-        Returns:
-            List of tables (each table is a list of rows)
-        """
         with pdfplumber.open(pdf_path) as pdf:
             if page_number <= len(pdf.pages):
-                page = pdf.pages[page_number - 1]
-                return page.extract_tables()
+                return pdf.pages[page_number - 1].extract_tables() or []
         return []
 
-    def get_page_text(
-        self,
-        pdf_path: Path,
-        page_number: int
-    ) -> str:
-        """
-        Extract raw text from a specific page.
-
-        Args:
-            pdf_path: Path to PDF file
-            page_number: Page number (1-indexed)
-
-        Returns:
-            Raw text content
-        """
+    def get_page_text(self, pdf_path: Path, page_number: int) -> str:
         with pdfplumber.open(pdf_path) as pdf:
             if page_number <= len(pdf.pages):
-                page = pdf.pages[page_number - 1]
-                return page.extract_text() or ""
+                return pdf.pages[page_number - 1].extract_text() or ""
         return ""
 
     def detect_footnotes(
         self,
         elements: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """
-        Detect and mark footnotes in the document.
-
-        Args:
-            elements: List of structured elements
-
-        Returns:
-            Updated elements with footnote markers
-        """
         for element in elements:
             content = element.get("content", "").strip()
-
-            # Simple heuristic for footnote detection
-            # Footnotes usually start with numbers or symbols and are shorter
-            if element.get("type") == "Footer" or (
-                len(content) < 200 and
-                content and
-                content[0].isdigit() or content.startswith("*")
-            ):
-                element["is_footnote"] = True
-            else:
-                element["is_footnote"] = False
-
+            element["is_footnote"] = (
+                element.get("type") == "Footer"
+                or (len(content) < 200 and bool(content)
+                    and (content[0].isdigit() or content.startswith("*")))
+            )
         return elements
 
 
-# Convenience functions
+# Convenience function
 def parse_financial_document(pdf_path: Path) -> Dict[str, Any]:
-    """
-    Quick function to parse a financial PDF document.
-
-    Args:
-        pdf_path: Path to PDF file
-
-    Returns:
-        Parsed document structure
-    """
-    parser = FinancialPDFParser()
-    return parser.parse_document(pdf_path)
+    return FinancialPDFParser().parse_document(pdf_path)
 
 
 if __name__ == "__main__":
-    # Test the parser
     import sys
-
     if len(sys.argv) > 1:
         test_path = Path(sys.argv[1])
         if test_path.exists():

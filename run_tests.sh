@@ -5,15 +5,17 @@ echo "========================================="
 echo "Running Financial Intelligence RAG Tests"
 echo "========================================="
 
-# Activate virtual environment if it exists
-if [ -d "venv" ]; then
-    source .venv/bin/activate
+# Resolve pytest from the virtualenv
+if [ -f ".venv/bin/pytest" ]; then
+    PYTEST=".venv/bin/pytest"
+else
+    PYTEST="pytest"
 fi
 
-# Run pytest with coverage
+# Run pytest
 echo ""
 echo "Running unit tests..."
-pytest tests/ -v --tb=short
+PYTHONPATH=. $PYTEST tests/ -v --tb=short
 
 echo ""
 echo "========================================="

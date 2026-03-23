@@ -92,6 +92,7 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 EMBEDDINGS_DIR = DATA_DIR / "embeddings"
 DOCS_DIR = PROJECT_ROOT / "documentation"
+EVALUATION_DIR = PROJECT_ROOT / "src" / "evaluation"
 
 # Ensure directories exist
 for directory in [RAW_DATA_DIR, PROCESSED_DATA_DIR, EMBEDDINGS_DIR, DOCS_DIR]:

@@ -10,7 +10,7 @@ from loguru import logger
 # Add src to path
 sys.path.append(str(Path(__file__).parent))
 
-from src.config import get_settings, EVALUATION_DIR
+from src.config import get_settings, EVALUATION_DIR, PROCESSED_DATA_DIR
 from src.ingestion.embedding_service import EmbeddingService
 from src.retrieval.vector_store import QdrantVectorStore
 from src.retrieval.bm25_search import BM25KeywordSearch
@@ -89,10 +89,14 @@ def main():
         logger.info("Loading BM25 index...")
         bm25_search = BM25KeywordSearch()
 
-        # Try to load existing BM25 index
+        # Try to load existing BM25 index (find the most recent .pkl in processed dir)
         try:
-            bm25_search.load_index()
-            logger.info(f"BM25 index loaded with {len(bm25_search.documents)} documents")
+            bm25_files = sorted(PROCESSED_DATA_DIR.glob("*_bm25.pkl"))
+            if not bm25_files:
+                raise FileNotFoundError("No BM25 index found in data/processed/")
+            bm25_path = bm25_files[-1]
+            bm25_search.load_index(bm25_path)
+            logger.info(f"BM25 index loaded from {bm25_path} with {len(bm25_search.chunks)} documents")
         except Exception as e:
             logger.error(f"Could not load BM25 index: {e}")
             logger.error("Please run document ingestion first.")
@@ -116,6 +120,7 @@ def main():
             hybrid_retriever=hybrid_retriever,
             citation_engine=citation_engine,
             llm_model=args.model,
+            llm_provider=settings.llm_provider,
             temperature=0.0
         )
 

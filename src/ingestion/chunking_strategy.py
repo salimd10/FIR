@@ -41,8 +41,8 @@ class FinancialDocumentChunker:
 
     def __init__(
         self,
-        chunk_size: int = 1024,
-        chunk_overlap: int = 128,
+        chunk_size: int = 512,
+        chunk_overlap: int = 64,
         model_name: str = "gpt-4"
     ):
         """

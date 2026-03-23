@@ -3,7 +3,7 @@ RAG Orchestrator that integrates LLM with retrieval system.
 Handles answer generation, tool usage, and multi-step reasoning.
 """
 from typing import Dict, Any, Optional, List
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langgraph.prebuilt import create_react_agent
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -74,37 +74,22 @@ class RAGOrchestrator:
         self.tools = [self.calculator.create_langchain_tool()]
 
         # Create agent
-        self.agent = self._create_agent()
-        self.agent_executor = AgentExecutor(
-            agent=self.agent,
-            tools=self.tools,
-            verbose=True,
-            max_iterations=5,
-            handle_parsing_errors=True
-        )
+        self.agent_executor = self._create_agent()
 
         self.logger.info(f"RAG Orchestrator initialized with model: {llm_model}")
 
     def _create_agent(self):
         """
-        Create the LangChain agent with tools.
+        Create the LangGraph agent with tools.
 
         Returns:
-            Agent instance
+            Compiled agent graph
         """
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", RAG_SYSTEM_PROMPT),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
-
-        agent = create_tool_calling_agent(
-            llm=self.llm,
+        return create_react_agent(
+            model=self.llm,
             tools=self.tools,
-            prompt=prompt
+            prompt=RAG_SYSTEM_PROMPT
         )
-
-        return agent
 
     def answer_question(
         self,
@@ -156,8 +141,10 @@ class RAGOrchestrator:
             # Step 4: Generate answer with LLM (and tools if needed)
             if include_calculations and self._requires_calculation(question):
                 # Use agent with tools
-                result = self.agent_executor.invoke({"input": prompt_input})
-                answer = result["output"]
+                result = self.agent_executor.invoke(
+                    {"messages": [HumanMessage(content=prompt_input)]}
+                )
+                answer = result["messages"][-1].content
                 calculation_steps = self._extract_calculation_steps(result)
             else:
                 # Direct LLM call without tools
@@ -212,7 +199,7 @@ class RAGOrchestrator:
         for i, chunk in enumerate(chunks, 1):
             section = chunk.get("section", "Unknown")
             page = chunk.get("page_number", "Unknown")
-            content = chunk.get("content", "")
+            content = self._clean_chunk_content(chunk.get("content", ""))
             chunk_type = chunk.get("chunk_type", "text")
 
             context_parts.append(
@@ -220,6 +207,15 @@ class RAGOrchestrator:
             )
 
         return "\n".join(context_parts)
+
+    def _clean_chunk_content(self, content: str) -> str:
+        """Remove repeated PDF header noise from chunk content."""
+        import re
+        # Remove repeated markdown headers like "## Apple Inc. | 2025 Form 10-K | 18"
+        content = re.sub(r'(## Apple Inc\. \| \d{4} Form 10-K \| \d+\s*\n?)+', '', content)
+        # Collapse multiple blank lines
+        content = re.sub(r'\n{3,}', '\n\n', content)
+        return content.strip()
 
     def _create_prompt_input(self, question: str, context: str) -> str:
         """

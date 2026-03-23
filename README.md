@@ -51,26 +51,26 @@ This system allows financial analysts to ask complex questions about SEC 10-K fi
 ```bash
 cd /home/salim/Desktop/PROJECTS/personal/FIR
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
 2. **Install dependencies:**
 
 ```bash
-pip install -r requirements.txt
+.venv/bin/pip install --upgrade pip
+.venv/bin/pip install -r requirements.txt
 ```
 
 3. **Configure environment:**
 
 ```bash
 cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Edit .env and add your API keys
 ```
 
 4. **Start infrastructure:**
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 This starts:
@@ -84,7 +84,7 @@ This starts:
 curl http://localhost:6333/collections
 
 # Check Redis
-redis-cli ping
+docker exec redis_financial_rag redis-cli ping
 ```
 
 ### Download Apple 10-K
@@ -99,7 +99,7 @@ wget https://s2.q4cdn.com/470004039/files/doc_financials/2025/ar/_10-K-2025-As-F
 
 ```bash
 # Process the 10-K PDF
-python src/ingestion/document_loader.py data/raw/apple-10k-2025.pdf
+PYTHONPATH=. .venv/bin/python src/ingestion/document_loader.py data/raw/apple-10k-2025.pdf
 ```
 
 This will:
@@ -113,10 +113,10 @@ This will:
 
 ```bash
 # Development mode
-uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+PYTHONPATH=. .venv/bin/uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 
 # Production mode
-uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
+PYTHONPATH=. .venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 ### Test the API
@@ -162,7 +162,8 @@ FIR/
 │   │   └── models.py           # Pydantic schemas
 │   │
 │   ├── evaluation/             # Testing & metrics
-│   │   ├── golden_dataset.json # 5 test questions
+│   │   ├── golden_dataset.json # 5 test questions (known issues — see Dataset Comparison)
+│   │   ├── silver_dataset.json # 8 verified questions grounded in actual 10-K values
 │   │   └── eval_pipeline.py    # RAGAS evaluation
 │   │
 │   ├── utils/                  # Utilities
@@ -190,8 +191,7 @@ FIR/
 **Problem**: Standard PDF parsers lose table structure and relationships.
 
 **Solution**:
-- Uses `unstructured.io` with `hi_res` strategy for layout detection
-- `pdfplumber` for precise table extraction
+- Uses `pdfplumber` for layout-aware text and table extraction
 - Converts tables to Markdown while preserving headers
 - Maintains context with section titles and page numbers
 
@@ -276,15 +276,6 @@ You may want to ask about headcount growth rate or total compensation instead.
 
 ## 📊 Evaluation
 
-### Golden Dataset
-
-5 curated questions testing:
-1. Multi-step calculations
-2. Table navigation
-3. GAAP vs Non-GAAP reconciliation
-4. Segment analysis
-5. Risk factor extraction
-
 ### RAGAS Metrics
 
 - **Faithfulness**: Answer grounded in context (target: >0.85)
@@ -295,8 +286,62 @@ You may want to ask about headcount growth rate or total compensation instead.
 ### Run Evaluation
 
 ```bash
-python src/evaluation/eval_pipeline.py --dataset golden_dataset.json
+# Run with the silver dataset (recommended)
+PYTHONPATH=. .venv/bin/python run_evaluation.py --dataset src/evaluation/silver_dataset.json
+
+# Run with the original golden dataset
+PYTHONPATH=. .venv/bin/python run_evaluation.py --dataset src/evaluation/golden_dataset.json
+
+# With options
+PYTHONPATH=. .venv/bin/python run_evaluation.py --model gpt-4o-mini --top-k 10
+
+# Custom dataset
+PYTHONPATH=. .venv/bin/python run_evaluation.py --dataset path/to/dataset.json
 ```
+
+**Prerequisites:** Qdrant running (`docker compose up -d`) and document ingested.
+
+---
+
+### Dataset Comparison: Golden vs Silver
+
+#### Golden Dataset — Known Issues
+
+The original `golden_dataset.json` (5 questions) has fundamental flaws that cause RAGAS scores to collapse, most critically **Context Precision = 0.000** and **Context Recall = 0.000** regardless of retrieval quality.
+
+| Question | Issue |
+|---|---|
+| Q1 — Direct/indirect channel split | Assumes a 60%/40% split that **does not exist** in the Apple 10-K. The expected answer is fabricated. |
+| Q2 — R&D percentage change | Expected answer is `"The exact percentage depends on the values in the 10-K"` — a non-answer that RAGAS cannot match against any generated output. |
+| Q3 — Non-GAAP vs GAAP reconciliation (Greater China) | Apple's 10-K does **not** publish a Non-GAAP adjusted Net Income reconciliation for individual segments. This data is absent from the document. |
+| Q4 — Services vs hardware breakdown for Americas segment | The 10-K reports segment data by geography and product category separately; the **intersection** (services revenue within Americas) is not explicitly stated. |
+| Q5 — Percentage of materials from a single source | Vague enough to be answerable, but paired with an expected answer that is too generic for RAGAS to score reliably. |
+
+**Effect on evaluation:**
+- Questions asking for data not in the document produce `NOT_FOUND` answers → **Answer Relevancy tanks**
+- Retrieved chunks don't contain ground-truth information → **Context Precision and Recall = 0**
+- Overall RAGAS scores become meaningless as a signal of system quality
+
+#### Silver Dataset — What Changed
+
+`silver_dataset.json` (8 questions) is built entirely from values confirmed to exist in the Apple FY2025 10-K. Every expected answer contains **concrete figures** from the document.
+
+| Q | Question | Data Source | Type |
+|---|---|---|---|
+| Q1 | Total Net Sales FY2025 vs FY2024 YoY change | Page 32, Income Statement | Calculation |
+| Q2 | R&D expense YoY % change FY2024→FY2025 | Page 32, Income Statement | Calculation |
+| Q3 | Greater China segment net sales YoY change | Page 25, Segment Data | Calculation |
+| Q4 | Services as % of total net sales FY2025 | Page 32, Income Statement | Calculation |
+| Q5 | Net Income and EPS for FY2025 | Page 32, Income Statement | Factual |
+| Q6 | Gross margin and gross margin % FY2025 | Page 32, Income Statement | Calculation |
+| Q7 | Highest-revenue product category FY2025 | Page 39, Disaggregated Sales | Factual |
+| Q8 | Total operating expenses (R&D + SG&A) FY2025 | Page 32, Income Statement | Calculation |
+
+**Key design principles:**
+- All ground-truth values are extractable from the retrieved document chunks
+- Expected answers include exact dollar figures so RAGAS can score faithfulness and correctness accurately
+- Mix of easy, medium difficulty and both factual and calculation question types
+- No questions that require information at a granularity not present in the filing
 
 ## 🔧 API Reference
 
@@ -360,13 +405,16 @@ Check system health.
 
 ```bash
 # Run all tests
-pytest
+PYTHONPATH=. .venv/bin/pytest
 
 # With coverage
-pytest --cov=src --cov-report=html
+PYTHONPATH=. .venv/bin/pytest --cov=src --cov-report=html
 
 # Specific module
-pytest tests/test_ingestion/
+PYTHONPATH=. .venv/bin/pytest tests/test_ingestion/
+
+# Or use the test runner script
+bash run_tests.sh
 ```
 
 ## 📈 Scaling to 10,000 Documents
@@ -446,7 +494,7 @@ pytest tests/test_ingestion/
 | Embeddings | OpenAI text-embedding-3-large | High quality (3072 dims), financial text |
 | LLM | GPT-4 | Function calling, high reasoning ability |
 | Keyword Search | BM25 (rank-bpf) | Industry standard, exact term matching |
-| PDF Parsing | Unstructured.io + pdfplumber | Layout awareness, table extraction |
+| PDF Parsing | pdfplumber | Layout awareness, table extraction |
 | Evaluation | RAGAS | LLM-as-judge, standard RAG metrics |
 | Orchestration | LangChain | Tool integration, agent patterns |
 

@@ -29,7 +29,7 @@ class SystemPrompts:
 3. **Use calculator for math** - ANY calculation must use the financial_calculator tool
 4. **Cite your sources** - Format: (Page X, Section Y)
 5. **Be precise** - Use exact numbers from the document
-6. **Show your work** - For calculations, show the formula and steps
+6. **Report results only** - For calculations, state the source values from context and the final computed result. Do NOT include formula derivations, LaTeX, or intermediate reasoning steps in your response.
 
 **If information is NOT in the context:**
 
@@ -43,6 +43,9 @@ Break them down into specific sub-questions:
 - What are the major risk factors?
 
 Then answer each specifically.
+
+**For calculations:**
+After computing a result with the calculator, state only the source values from context and the final result. For example: "According to the 10-K, R&D was $34,550M in FY2025 and $31,370M in FY2024 (Page 28). The year-over-year percentage change was 10.14%." Do NOT write out formulas, LaTeX expressions, or step-by-step derivations — these introduce claims not found in the source document.
 
 **Remember:**
 - Accuracy > Speed
@@ -61,9 +64,9 @@ Never hallucinate. Never approximate. Always cite."""
 2. Identify the calculation type (percentage change, difference, ratio, etc.)
 3. Write Python code for the calculation
 4. Use the financial_calculator tool
-5. Interpret and format the result with proper units
+5. Report the source values (with page citation) and the final computed result only
 
-Show each step clearly."""
+Do NOT include formula derivations, LaTeX, or intermediate reasoning in your final answer."""
 
     @staticmethod
     def get_query_expansion_prompt() -> str:
@@ -104,9 +107,9 @@ Context from 10-K filing:
 
 Instructions:
 1. Extract all relevant numbers from the context
-2. Identify what calculation is needed
-3. Use the financial_calculator tool to perform the calculation
-4. Provide the final answer with proper citations
+2. Use the financial_calculator tool to perform the calculation
+3. In your final answer, state only: the source values with page citations, and the computed result
+4. Do NOT include formula derivations, LaTeX expressions, or step-by-step reasoning in your answer
 
 Answer:"""
 

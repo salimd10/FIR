@@ -57,11 +57,8 @@ LLM_MAX_TOKENS=2000
 ### 3. Start Infrastructure
 
 ```bash
-# Activate virtual environment
-source .venv/bin/activate
-
 # Start Qdrant vector database
-docker-compose up -d
+docker compose up -d
 
 # Verify Qdrant is running
 curl http://localhost:6333
@@ -70,15 +67,14 @@ curl http://localhost:6333
 ### 4. Ingest Documents
 
 ```bash
-# Add your PDF files to data/raw/
-# Then run ingestion:
-python src/ingestion/pipeline.py --input-dir data/raw
+# Add your PDF files to data/raw/, then run ingestion:
+PYTHONPATH=. .venv/bin/python src/ingestion/document_loader.py data/raw/apple-10k-2025.pdf
 ```
 
 ### 5. Start API Server
 
 ```bash
-uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+PYTHONPATH=. .venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 You should see:

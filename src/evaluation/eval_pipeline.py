@@ -15,11 +15,14 @@ from ragas.metrics import (
     context_recall,
     context_precision,
 )
+from ragas.llms import LangchainLLMWrapper
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from datasets import Dataset
 from loguru import logger
 
 from src.agents.rag_orchestrator import RAGOrchestrator
-from src.config import EVALUATION_DIR
+from src.config import EVALUATION_DIR, get_settings
 
 
 class RAGASEvaluationPipeline:
@@ -168,7 +171,7 @@ class RAGASEvaluationPipeline:
 
         for citation in citations:
             if isinstance(citation, dict):
-                context = citation.get("text", "")
+                context = citation.get("full_text") or citation.get("text", "")
             else:
                 context = str(citation)
 
@@ -225,17 +228,31 @@ class RAGASEvaluationPipeline:
 
         self.logger.info(f"Dataset prepared: {len(dataset)} samples")
 
+        # Configure RAGAS LLM and embeddings from settings
+        settings = get_settings()
+        ragas_llm = LangchainLLMWrapper(ChatOpenAI(
+            model=settings.ragas_judge_model,
+            api_key=settings.openai_api_key
+        ))
+        ragas_embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings(
+            model=settings.openai_embedding_model,
+            api_key=settings.openai_api_key
+        ))
+
         # Run RAGAS evaluation
         try:
             evaluation_result = evaluate(
                 dataset=dataset,
-                metrics=metrics
+                metrics=metrics,
+                llm=ragas_llm,
+                embeddings=ragas_embeddings
             )
 
             # Convert to dict
+            df = evaluation_result.to_pandas()
             results_dict = {
-                "overall_scores": evaluation_result.to_pandas().mean().to_dict(),
-                "per_question_scores": evaluation_result.to_pandas().to_dict('records'),
+                "overall_scores": df.select_dtypes(include="number").mean().to_dict(),
+                "per_question_scores": df.to_dict('records'),
                 "summary": {
                     "num_questions": len(dataset),
                     "timestamp": datetime.now().isoformat(),

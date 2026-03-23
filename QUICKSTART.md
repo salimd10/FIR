@@ -73,11 +73,10 @@ The script will:
 ```bash
 # 1. Create virtual environment
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # 2. Install dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
+.venv/bin/pip install --upgrade pip
+.venv/bin/pip install -r requirements.txt
 
 # 3. Configure environment
 cp .env.example .env
@@ -86,11 +85,11 @@ cp .env.example .env
 #   - OPENAI_API_KEY (for embeddings)
 
 # 4. Start Docker services
-docker-compose up -d
+docker compose up -d
 
 # 5. Verify services
-curl http://localhost:6333/collections  # Qdrant
-redis-cli ping  # Redis
+curl http://localhost:6333/collections              # Qdrant
+docker exec redis_financial_rag redis-cli ping     # Redis
 ```
 
 ## Download Data (2 minutes)
@@ -107,11 +106,8 @@ ls -lh data/raw/
 ## Ingest Document (5 minutes)
 
 ```bash
-# Activate environment (if not already)
-source .venv/bin/activate
-
-# Run ingestion pipeline
-python src/ingestion/document_loader.py data/raw/apple-10k-2025.pdf
+# Run ingestion pipeline (PYTHONPATH=. is required so Python can find the src package)
+PYTHONPATH=. .venv/bin/python src/ingestion/document_loader.py data/raw/apple-10k-2025.pdf
 ```
 
 This will:
@@ -139,10 +135,10 @@ This will:
 
 ```bash
 # Development mode (with auto-reload)
-uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+PYTHONPATH=. .venv/bin/uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 
 # Production mode
-# uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
+# PYTHONPATH=. .venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 **Expected Output**:
@@ -273,7 +269,7 @@ ps aux | grep uvicorn
 tail -f logs/api.log
 
 # Restart API
-uvicorn src.api.main:app --reload
+PYTHONPATH=. .venv/bin/uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Issue: "ANTHROPIC_API_KEY not found" or "OPENAI_API_KEY not found"
@@ -312,7 +308,7 @@ docker logs qdrant_financial_rag
 curl http://localhost:8000/api/collection/info
 
 # If vectors_count is 0, re-run ingestion:
-python src/ingestion/document_loader.py data/raw/apple-10k-2025.pdf
+PYTHONPATH=. .venv/bin/python src/ingestion/document_loader.py data/raw/apple-10k-2025.pdf
 ```
 
 ## Next Steps
@@ -345,7 +341,7 @@ Edit `.env` to tune:
 wget <url> -O data/raw/another-10k.pdf
 
 # Ingest it
-python src/ingestion/document_loader.py data/raw/another-10k.pdf
+PYTHONPATH=. .venv/bin/python src/ingestion/document_loader.py data/raw/another-10k.pdf
 ```
 
 ### 5. Run Evaluation (Future Implementation)
@@ -412,23 +408,20 @@ curl -X POST http://localhost:8000/api/query ...
 Ctrl+C
 
 # Stop Docker services
-docker-compose down
+docker compose down
 
 # Or keep data volumes
-docker-compose down --volumes
+docker compose down --volumes
 ```
 
 ### Start Services Again
 
 ```bash
 # Start Docker
-docker-compose up -d
-
-# Activate venv
-source .venv/bin/activate
+docker compose up -d
 
 # Start API
-uvicorn src.api.main:app --reload
+PYTHONPATH=. .venv/bin/uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Production Deployment Checklist

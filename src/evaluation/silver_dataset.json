@@ -1,0 +1,98 @@
+[
+  {
+    "question_id": "Q1",
+    "question": "What was Apple's total Net Sales for FY2025 and FY2024, and what was the year-over-year percentage change?",
+    "expected_answer": "Apple's total Net Sales were $416,161 million in FY2025 and $391,035 million in FY2024, representing a year-over-year increase of approximately 6%.",
+    "expected_calculation": "((416161 - 391035) / 391035) * 100",
+    "expected_result": 6.43,
+    "page_reference": 32,
+    "section": "Consolidated Statements of Operations",
+    "requires_calculation": true,
+    "difficulty": "easy",
+    "tags": ["net_sales", "year-over-year", "growth_rate"]
+  },
+  {
+    "question_id": "Q2",
+    "question": "What was the year-over-year percentage change in Research and Development expenses between FY2024 and FY2025?",
+    "expected_answer": "R&D expenses increased from $31,370 million in FY2024 to $34,550 million in FY2025, a year-over-year increase of approximately 10.1%.",
+    "expected_calculation": "((34550 - 31370) / 31370) * 100",
+    "expected_result": 10.14,
+    "page_reference": 32,
+    "section": "Consolidated Statements of Operations",
+    "requires_calculation": true,
+    "difficulty": "medium",
+    "tags": ["r&d", "year-over-year", "growth_rate", "operating_expenses"]
+  },
+  {
+    "question_id": "Q3",
+    "question": "What were Apple's Net Sales for the Greater China segment in FY2025 and FY2024, and by what percentage did they change?",
+    "expected_answer": "Greater China Net Sales were $64,377 million in FY2025 and $66,952 million in FY2024, a decrease of approximately 4% year-over-year.",
+    "expected_calculation": "((64377 - 66952) / 66952) * 100",
+    "expected_result": -3.85,
+    "page_reference": 25,
+    "section": "Segment Operating Performance",
+    "requires_calculation": true,
+    "difficulty": "medium",
+    "tags": ["greater_china", "segment", "year-over-year", "net_sales"]
+  },
+  {
+    "question_id": "Q4",
+    "question": "What were Apple's Services net sales and Products net sales for FY2025, and what percentage of total net sales did Services represent?",
+    "expected_answer": "In FY2025, Apple's Services net sales were $109,158 million and Products net sales were $307,003 million, totaling $416,161 million. Services represented approximately 26.2% of total net sales.",
+    "expected_calculation": "(109158 / 416161) * 100",
+    "expected_result": 26.23,
+    "page_reference": 32,
+    "section": "Consolidated Statements of Operations",
+    "requires_calculation": true,
+    "difficulty": "medium",
+    "tags": ["services", "products", "revenue_mix", "percentage"]
+  },
+  {
+    "question_id": "Q5",
+    "question": "What was Apple's Net Income for FY2025 and what were the basic and diluted earnings per share?",
+    "expected_answer": "Apple's Net Income for FY2025 was $112,010 million. Basic earnings per share were $7.49 and diluted earnings per share were $7.46.",
+    "expected_calculation": null,
+    "expected_result": null,
+    "page_reference": 32,
+    "section": "Consolidated Statements of Operations",
+    "requires_calculation": false,
+    "difficulty": "easy",
+    "tags": ["net_income", "eps", "earnings_per_share"]
+  },
+  {
+    "question_id": "Q6",
+    "question": "What was Apple's gross margin for FY2025, and what was the gross margin percentage relative to total net sales?",
+    "expected_answer": "Apple's gross margin for FY2025 was $195,201 million. As a percentage of total net sales of $416,161 million, the gross margin was approximately 46.9%.",
+    "expected_calculation": "(195201 / 416161) * 100",
+    "expected_result": 46.9,
+    "page_reference": 32,
+    "section": "Consolidated Statements of Operations",
+    "requires_calculation": true,
+    "difficulty": "medium",
+    "tags": ["gross_margin", "profitability", "percentage"]
+  },
+  {
+    "question_id": "Q7",
+    "question": "Which Apple product category had the highest net sales in FY2025 and what was the value?",
+    "expected_answer": "iPhone had the highest net sales in FY2025 at $209,586 million, accounting for the largest share of Apple's product revenue.",
+    "expected_calculation": null,
+    "expected_result": null,
+    "page_reference": 39,
+    "section": "Disaggregated Net Sales",
+    "requires_calculation": false,
+    "difficulty": "easy",
+    "tags": ["iphone", "product_category", "net_sales"]
+  },
+  {
+    "question_id": "Q8",
+    "question": "What were Apple's total operating expenses (R&D plus Selling, General and Administrative) for FY2025?",
+    "expected_answer": "Apple's total operating expenses for FY2025 were $62,151 million, comprising R&D expenses of $34,550 million and Selling, General and Administrative expenses of $27,601 million.",
+    "expected_calculation": "34550 + 27601",
+    "expected_result": 62151,
+    "page_reference": 32,
+    "section": "Consolidated Statements of Operations",
+    "requires_calculation": true,
+    "difficulty": "easy",
+    "tags": ["operating_expenses", "r&d", "sga"]
+  }
+]
